@@ -89,4 +89,3 @@ obj RagEngine {
         return results;
     }
 }
-

@@ -22,7 +22,7 @@ def bootstrap_frontend(token: str) -> None:
         with st.chat_message('user'):
             st.markdown(prompt)
         with st.chat_message('assistant'):
-            response = requests.post('http://localhost:8000/walker/interact', json={'message': prompt, 'session_id': '123'}, headers={'Authorization': f'Bearer {token}'})
+            response = requests.post('http://localhost:8000/walker/interact', json={'message': prompt, 'session_id': '123', 'model': 'llama'}, headers={'Authorization': f'Bearer {token}'})
             if response.status_code == 200:
                 response = response.json()
                 print(response)

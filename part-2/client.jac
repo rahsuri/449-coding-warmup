@@ -28,7 +28,7 @@ can bootstrap_frontend (token: str) {
         with st.chat_message("assistant") {
 
             # Call walker API
-            response = requests.post("http://localhost:8000/walker/interact", json={"message": prompt, "session_id": "123"},
+            response = requests.post("http://localhost:8000/walker/interact", json={"message": prompt, "session_id": "123", "model": "openai"}, #changed "model" value to choose between openai and llama
                 headers={"Authorization": f"Bearer {token}"}
             );
 

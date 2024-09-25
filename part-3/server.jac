@@ -1,12 +1,13 @@
-import:py from mtllm.llms {Ollama}
+import:py from mtllm.llms {OpenAI}
 import:jac from rag {RagEngine}
 
-glob llm = Ollama(model_name='llama3.1');
+glob llm = OpenAI(model_name='gpt-4o');
 glob rag_engine:RagEngine = RagEngine();
 
 enum ChatType {
     RAG : 'Need to use Retrievable information in specific documents to respond' = "RAG",
-    QA : 'Given context is enough for an answer' = "user_qa"
+    QA : 'Given context is enough for an answer' = "user_qa",
+    MIXED : 'Need to use both RAG and previous contexts to answer question.' = "mixed"
 }
 
 node Router {
@@ -37,6 +38,7 @@ walker infer {
             router_node = here ++> Router();
             router_node ++> RagChat();
             router_node ++> QAChat();
+            router_node ++> MixedChat();
             visit router_node;
         }
     }
@@ -82,7 +84,7 @@ node RagChat :Chat: {
         respond_with_llm(   message:'current message':str,
                     chat_history: 'chat history':list[dict],
                     agent_role:'role of the agent responding':str,
-                    context:'retirved context from documents':list
+                    context:'retrieved context from documents':list
                         ) -> 'response':str by llm();
         data = rag_engine.get_from_chroma(query=here.message);
         here.response = respond_with_llm(here.message, here.chat_history, "You are a conversation agent designed to help users with their queries based on the documents provided", data);
@@ -99,5 +101,20 @@ node QAChat :Chat: {
             agent_role:'role of the agent responding':str
                 ) -> 'response':str by llm();
         here.response = respond_with_llm(here.message, here.chat_history, agent_role="You are a conversation agent designed to help users with their queries");
+    }
+}
+
+node MixedChat :Chat: {
+    has chat_type: ChatType = ChatType.MIXED;
+
+    can respond with infer entry {
+        can 'Respond to message using chat_history as context and agent_role as the goal of the agent'
+        respond_with_llm(   message:'current message':str,
+            chat_history: 'chat history':list[dict],
+            agent_role:'role of the agent responding':str,
+            context:'retrieved context from documents':list
+                ) -> 'response':str by llm();
+        data = rag_engine.get_from_chroma(query=here.message);
+        here.response = respond_with_llm(here.message, here.chat_history, "You are a conversation agent designed to help users with their queries based on the documents provided, and information that has already been provided.", data);
     }
 }

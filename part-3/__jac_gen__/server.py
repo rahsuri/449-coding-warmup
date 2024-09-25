@@ -6,19 +6,20 @@ from jaclang.plugin.builtin import *
 from dataclasses import dataclass as __jac_dataclass__
 from enum import Enum as __jac_Enum__, auto as __jac_auto__
 if _jac_typ.TYPE_CHECKING:
-    from mtllm.llms import Ollama
+    from mtllm.llms import OpenAI
 else:
-    Ollama, = __jac_import__(target='mtllm.llms', base_path=__file__, lng='py', absorb=False, mdl_alias=None, items={'Ollama': None})
+    OpenAI, = __jac_import__(target='mtllm.llms', base_path=__file__, lng='py', absorb=False, mdl_alias=None, items={'OpenAI': None})
 if _jac_typ.TYPE_CHECKING:
     from rag import RagEngine
 else:
     RagEngine, = __jac_import__(target='rag', base_path=__file__, lng='jac', absorb=False, mdl_alias=None, items={'RagEngine': None})
-llm = Ollama(model_name='llama3.1')
+llm = OpenAI(model_name='gpt-4o')
 rag_engine: RagEngine = RagEngine()
 
 class ChatType(__jac_Enum__):
     RAG = 'RAG'
     QA = 'user_qa'
+    MIXED = 'mixed'
 
 @_Jac.make_node(on_entry=[], on_exit=[])
 @__jac_dataclass__(eq=False)
@@ -55,6 +56,7 @@ class infer(_Jac.Walker):
             router_node = _Jac.connect(left=_jac_here_, right=Router(), edge_spec=_Jac.build_edge(is_undirected=False, conn_type=None, conn_assign=None))
             _Jac.connect(left=router_node, right=RagChat(), edge_spec=_Jac.build_edge(is_undirected=False, conn_type=None, conn_assign=None))
             _Jac.connect(left=router_node, right=QAChat(), edge_spec=_Jac.build_edge(is_undirected=False, conn_type=None, conn_assign=None))
+            _Jac.connect(left=router_node, right=MixedChat(), edge_spec=_Jac.build_edge(is_undirected=False, conn_type=None, conn_assign=None))
             if _Jac.visit_node(self, router_node):
                 pass
 
@@ -92,7 +94,7 @@ class RagChat(Chat, _Jac.Node):
     def respond(self, _jac_here_: infer) -> None:
 
         def respond_with_llm(message: str, chat_history: list[dict], agent_role: str, context: list) -> str:
-            return _Jac.with_llm(file_loc=__file__, model=llm, model_params={}, scope='server(Module).RagChat(node).respond(Ability).respond_with_llm(Ability)', incl_info=[], excl_info=[], inputs=[('current message', str, 'message', message), ('chat history', list[dict], 'chat_history', chat_history), ('role of the agent responding', str, 'agent_role', agent_role), ('retirved context from documents', list, 'context', context)], outputs=('response', 'str'), action='Respond to message using chat_history as context and agent_role as the goal of the agent', _globals=globals(), _locals=locals())
+            return _Jac.with_llm(file_loc=__file__, model=llm, model_params={}, scope='server(Module).RagChat(node).respond(Ability).respond_with_llm(Ability)', incl_info=[], excl_info=[], inputs=[('current message', str, 'message', message), ('chat history', list[dict], 'chat_history', chat_history), ('role of the agent responding', str, 'agent_role', agent_role), ('retrieved context from documents', list, 'context', context)], outputs=('response', 'str'), action='Respond to message using chat_history as context and agent_role as the goal of the agent', _globals=globals(), _locals=locals())
         data = rag_engine.get_from_chroma(query=_jac_here_.message)
         _jac_here_.response = respond_with_llm(_jac_here_.message, _jac_here_.chat_history, 'You are a conversation agent designed to help users with their queries based on the documents provided', data)
 
@@ -106,3 +108,15 @@ class QAChat(Chat, _Jac.Node):
         def respond_with_llm(message: str, chat_history: list[dict], agent_role: str) -> str:
             return _Jac.with_llm(file_loc=__file__, model=llm, model_params={}, scope='server(Module).QAChat(node).respond(Ability).respond_with_llm(Ability)', incl_info=[], excl_info=[], inputs=[('current message', str, 'message', message), ('chat history', list[dict], 'chat_history', chat_history), ('role of the agent responding', str, 'agent_role', agent_role)], outputs=('response', 'str'), action='Respond to message using chat_history as context and agent_role as the goal of the agent', _globals=globals(), _locals=locals())
         _jac_here_.response = respond_with_llm(_jac_here_.message, _jac_here_.chat_history, agent_role='You are a conversation agent designed to help users with their queries')
+
+@_Jac.make_node(on_entry=[_Jac.DSFunc('respond', infer)], on_exit=[])
+@__jac_dataclass__(eq=False)
+class MixedChat(Chat, _Jac.Node):
+    chat_type: ChatType = _Jac.has_instance_default(gen_func=lambda: ChatType.MIXED)
+
+    def respond(self, _jac_here_: infer) -> None:
+
+        def respond_with_llm(message: str, chat_history: list[dict], agent_role: str, context: list) -> str:
+            return _Jac.with_llm(file_loc=__file__, model=llm, model_params={}, scope='server(Module).MixedChat(node).respond(Ability).respond_with_llm(Ability)', incl_info=[], excl_info=[], inputs=[('current message', str, 'message', message), ('chat history', list[dict], 'chat_history', chat_history), ('role of the agent responding', str, 'agent_role', agent_role), ('retrieved context from documents', list, 'context', context)], outputs=('response', 'str'), action='Respond to message using chat_history as context and agent_role as the goal of the agent', _globals=globals(), _locals=locals())
+        data = rag_engine.get_from_chroma(query=_jac_here_.message)
+        _jac_here_.response = respond_with_llm(_jac_here_.message, _jac_here_.chat_history, 'You are a conversation agent designed to help users with their queries based on the documents provided, and information that has already been provided.', data)
